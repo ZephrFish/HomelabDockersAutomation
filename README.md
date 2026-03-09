@@ -1,6 +1,6 @@
 # Homelab Docker Automation
 
-12 modular Docker stacks for a self-hosted homelab. Tested on Proxmox 8 / Debian 12.
+12 modular Docker stacks for a self-hosted homelab. Tested on Proxmox 9.1.6 / Debian 13.
 
 ## Quick Start
 
