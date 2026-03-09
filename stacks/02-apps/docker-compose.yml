@@ -1,0 +1,84 @@
+services:
+
+  # ── Arcane (Docker manager) ───────────────────────────────
+  arcane:
+    image: ghcr.io/getarcaneapp/arcane:latest
+    container_name: arcane
+    restart: unless-stopped
+    ports:
+      - "3552:3552"
+    group_add:
+      - "990"
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - arcane_data:/app/data
+      - /opt:/app/data/projects
+    environment:
+      - APP_URL=http://${HOST_IP}:3552
+      - PUID=0
+      - PGID=0
+      # Generate fresh values: openssl rand -base64 32
+      - ENCRYPTION_KEY=64fERYfuAuTgo2BT4o3M/OQmAQFoBiBCUE1SKBglw30=
+      - JWT_SECRET=e1lxHes1yqwbJ2MB4yCTPA+woPYa+TczSWGkth/7DAE=
+
+  # ── Uptime Kuma ───────────────────────────────────────────
+  uptime-kuma:
+    image: louislam/uptime-kuma:latest
+    container_name: uptime-kuma
+    restart: unless-stopped
+    ports:
+      - "3001:3001"
+    volumes:
+      - uptime_kuma_data:/app/data
+
+  # ── Nginx Proxy Manager ───────────────────────────────────
+  nginx-proxy-manager:
+    image: lepresidente/nginx-proxy-manager:v24.12.1
+    container_name: nginx-proxy-manager
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "80:8080"
+      - "81:8181"
+      - "443:4443"
+    volumes:
+      - npm_data:/data
+      - npm_letsencrypt:/etc/letsencrypt
+    networks:
+      - default
+      - crowdsec_default
+    environment:
+      # API_KEY: generate after deploying CrowdSec — cscli bouncers add npm-bouncer
+      CROWDSEC_OPENRESTY_BOUNCER: |
+        ENABLED=true
+        API_URL=http://crowdsec:8080
+        API_KEY=/ZAW55tfHQcJbtwRqzzAB7c3uVS4iVo/lzFBuDsRr8Q
+
+  # ── Homepage (dashboard) ──────────────────────────────────
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    container_name: homepage
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "3080:3000"
+    environment:
+      - HOMEPAGE_ALLOWED_HOSTS=${HOST_IP}:3080
+    volumes:
+      - homepage_config:/app/config
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+volumes:
+  arcane_data:
+  uptime_kuma_data:
+  npm_data:
+  npm_letsencrypt:
+  homepage_config:
+
+networks:
+  crowdsec_default:
+    external: true

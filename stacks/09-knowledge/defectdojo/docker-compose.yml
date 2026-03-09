@@ -1,0 +1,114 @@
+services:
+
+  # ── DefectDojo (vulnerability management) ─────────────────
+  defectdojo-nginx:
+    image: defectdojo/defectdojo-nginx:latest
+    container_name: defectdojo-nginx
+    restart: unless-stopped
+    ports:
+      - "8092:8080"
+    environment:
+      - NGINX_METRICS_ENABLED=false
+    volumes:
+      - defectdojo_static:/usr/share/nginx/html/static
+      - defectdojo_media:/usr/share/nginx/html/media
+    depends_on:
+      - defectdojo-django
+    security_opt:
+      - apparmor:unconfined
+
+  defectdojo-django:
+    image: defectdojo/defectdojo-django:latest
+    container_name: defectdojo-django
+    restart: unless-stopped
+    entrypoint: ["/wait-for-it.sh", "defectdojo-postgres:5432", "--", "/entrypoint-uwsgi.sh"]
+    environment:
+      - DD_DEBUG=False
+      - DD_ALLOWED_HOSTS=*
+      - DD_DATABASE_URL=postgresql://defectdojo:${DEFECTDOJO_DB_PASSWORD}@defectdojo-postgres:5432/defectdojo
+      - DD_CELERY_BROKER_URL=redis://defectdojo-redis:6379/0
+      - DD_SECRET_KEY=${DEFECTDOJO_SECRET_KEY}
+      - DD_CREDENTIAL_AES_256_KEY=${DEFECTDOJO_CREDENTIAL_KEY}
+      - DD_ADMIN_USER=admin
+      - DD_ADMIN_MAIL=${ADMIN_EMAIL}
+      - DD_ADMIN_FIRST_NAME=Admin
+      - DD_ADMIN_LAST_NAME=Admin
+      - DD_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - DD_INITIALIZE=true
+    volumes:
+      - defectdojo_static:/app/static
+      - defectdojo_media:/app/media
+    depends_on:
+      defectdojo-postgres:
+        condition: service_healthy
+      defectdojo-redis:
+        condition: service_started
+    networks:
+      default:
+        aliases:
+          - uwsgi
+    security_opt:
+      - apparmor:unconfined
+
+  defectdojo-celery-worker:
+    image: defectdojo/defectdojo-django:latest
+    container_name: defectdojo-celery-worker
+    restart: unless-stopped
+    entrypoint: ["/wait-for-it.sh", "defectdojo-django:3031", "--", "/entrypoint-celery-worker.sh"]
+    environment:
+      - DD_DATABASE_URL=postgresql://defectdojo:${DEFECTDOJO_DB_PASSWORD}@defectdojo-postgres:5432/defectdojo
+      - DD_CELERY_BROKER_URL=redis://defectdojo-redis:6379/0
+      - DD_SECRET_KEY=${DEFECTDOJO_SECRET_KEY}
+      - DD_CREDENTIAL_AES_256_KEY=${DEFECTDOJO_CREDENTIAL_KEY}
+    depends_on:
+      - defectdojo-django
+    security_opt:
+      - apparmor:unconfined
+
+  defectdojo-celery-beat:
+    image: defectdojo/defectdojo-django:latest
+    container_name: defectdojo-celery-beat
+    restart: unless-stopped
+    entrypoint: ["/wait-for-it.sh", "defectdojo-django:3031", "--", "/entrypoint-celery-beat.sh"]
+    environment:
+      - DD_DATABASE_URL=postgresql://defectdojo:${DEFECTDOJO_DB_PASSWORD}@defectdojo-postgres:5432/defectdojo
+      - DD_CELERY_BROKER_URL=redis://defectdojo-redis:6379/0
+      - DD_SECRET_KEY=${DEFECTDOJO_SECRET_KEY}
+      - DD_CREDENTIAL_AES_256_KEY=${DEFECTDOJO_CREDENTIAL_KEY}
+    depends_on:
+      - defectdojo-django
+    security_opt:
+      - apparmor:unconfined
+
+  defectdojo-postgres:
+    image: postgres:16-alpine
+    container_name: defectdojo-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=defectdojo
+      - POSTGRES_PASSWORD=${DEFECTDOJO_DB_PASSWORD}
+      - POSTGRES_DB=defectdojo
+    volumes:
+      - defectdojo_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U defectdojo"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - apparmor:unconfined
+
+  defectdojo-redis:
+    image: redis:7-alpine
+    container_name: defectdojo-redis
+    restart: unless-stopped
+    volumes:
+      - defectdojo_redis:/data
+    security_opt:
+      - apparmor:unconfined
+
+volumes:
+  defectdojo_static:
+  defectdojo_media:
+  defectdojo_db:
+  defectdojo_redis:
