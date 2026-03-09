@@ -1,0 +1,69 @@
+services:
+
+  # ── OpenCanary (honeypot) ─────────────────────────────────
+  opencanary:
+    image: thinkst/opencanary:latest
+    container_name: opencanary
+    restart: unless-stopped
+    command: ["--dev", "--allow-run-as-root"]
+    ports:
+      - "21:21"
+      - "23:23"
+      - "1433:1433"
+      - "2223:2223"
+      - "3306:3306"
+      - "3389:3389"
+      - "5900:5900"
+      - "8843:8843"
+      - "8880:8880"
+    volumes:
+      - opencanary_conf:/etc/opencanaryd
+      - opencanary_logs:/var/tmp
+    security_opt:
+      - apparmor:unconfined
+
+  # ── Alerter (tails log, sends to ntfy + email) ───────────
+  opencanary-alerter:
+    image: python:3.11-alpine
+    container_name: opencanary-alerter
+    restart: unless-stopped
+    command: sh /alerter.sh
+    volumes:
+      - opencanary_logs:/var/tmp
+      - /opt/opencanary/alerter.sh:/alerter.sh:ro
+    depends_on:
+      - opencanary
+      - opencanary-smtp
+
+  # ── Send-only Postfix relay ───────────────────────────────
+  opencanary-smtp:
+    image: boky/postfix
+    container_name: opencanary-smtp
+    restart: unless-stopped
+    environment:
+      - HOSTNAME=${HOST_HOSTNAME}
+      - ALLOWED_SENDER_DOMAINS=${HOST_HOSTNAME}
+    security_opt:
+      - apparmor:unconfined
+
+  # ── Web UI (Streamlit) ────────────────────────────────────
+  opencanary-ui:
+    image: opencanary-ui:local
+    container_name: opencanary-ui
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    volumes:
+      - opencanary_conf:/etc/opencanaryd
+      - opencanary_logs:/var/tmp:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - opencanary_ui_data:/data
+    security_opt:
+      - apparmor:unconfined
+    depends_on:
+      - opencanary
+
+volumes:
+  opencanary_conf:
+  opencanary_logs:
+  opencanary_ui_data:

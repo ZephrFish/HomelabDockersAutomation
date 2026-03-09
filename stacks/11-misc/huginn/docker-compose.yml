@@ -1,0 +1,52 @@
+services:
+
+  # ── Huginn (OSINT automation agent) ──────────────────────
+  huginn:
+    image: ghcr.io/huginn/huginn:latest
+    container_name: huginn
+    restart: unless-stopped
+    ports:
+      - "8103:3000"
+    environment:
+      - APP_SECRET_TOKEN=${HUGINN_SECRET_TOKEN}
+      - DOMAIN=${HOST_IP}:8103
+      - DATABASE_ADAPTER=postgresql
+      - DATABASE_HOST=huginn-postgres
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=huginn
+      - DATABASE_USERNAME=huginn
+      - DATABASE_PASSWORD=${ADMIN_PASSWORD}
+      - INVITATION_CODE=homelab
+      - SEED_USERNAME=admin
+      - SEED_PASSWORD=${ADMIN_PASSWORD}
+      - REQUIRE_CONFIRMED_EMAIL=false
+      - EMAIL_FROM_ADDRESS=${ADMIN_EMAIL}
+      - SMTP_DOMAIN=${HOST_HOSTNAME}
+      - ALLOW_UNCONFIRMED_ACCESS_FOR=2d
+      - TZ=Europe/London
+    depends_on:
+      huginn-postgres:
+        condition: service_healthy
+    security_opt:
+      - apparmor:unconfined
+
+  huginn-postgres:
+    image: postgres:16-alpine
+    container_name: huginn-postgres
+    restart: unless-stopped
+    command: postgres -c unix_socket_directories=""
+    environment:
+      - POSTGRES_DB=huginn
+      - POSTGRES_USER=huginn
+      - POSTGRES_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - huginn_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U huginn"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+volumes:
+  huginn_db:

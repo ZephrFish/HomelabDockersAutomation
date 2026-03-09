@@ -1,0 +1,87 @@
+services:
+
+  # ── Paperless-ngx (document management) ──────────────────
+  paperless:
+    image: ghcr.io/paperless-ngx/paperless-ngx:latest
+    container_name: paperless
+    restart: unless-stopped
+    ports:
+      - "8104:8000"
+    environment:
+      - PAPERLESS_REDIS=redis://paperless-redis:6379
+      - PAPERLESS_DBHOST=paperless-postgres
+      - PAPERLESS_DBNAME=paperless
+      - PAPERLESS_DBUSER=paperless
+      - PAPERLESS_DBPASS=${ADMIN_PASSWORD}
+      - PAPERLESS_SECRET_KEY=${PAPERLESS_SECRET_KEY}
+      - PAPERLESS_URL=http://${HOST_IP}:8104
+      - PAPERLESS_ADMIN_USER=admin
+      - PAPERLESS_ADMIN_PASSWORD=${ADMIN_PASSWORD}
+      - PAPERLESS_ADMIN_MAIL=${ADMIN_EMAIL}
+      - PAPERLESS_OCR_LANGUAGE=eng
+      - PAPERLESS_TIME_ZONE=Europe/London
+      - PAPERLESS_TIKA_ENABLED=1
+      - PAPERLESS_TIKA_GOTENBERG_ENDPOINT=http://paperless-gotenberg:3000
+      - PAPERLESS_TIKA_ENDPOINT=http://paperless-tika:9998
+      - USERMAP_UID=1000
+      - USERMAP_GID=1000
+    volumes:
+      - paperless_data:/usr/src/paperless/data
+      - paperless_media:/usr/src/paperless/media
+      - paperless_export:/usr/src/paperless/export
+      - paperless_consume:/usr/src/paperless/consume
+    depends_on:
+      paperless-postgres:
+        condition: service_healthy
+      paperless-redis:
+        condition: service_started
+    security_opt:
+      - apparmor:unconfined
+
+  paperless-postgres:
+    image: postgres:16-alpine
+    container_name: paperless-postgres
+    restart: unless-stopped
+    command: postgres -c unix_socket_directories=""
+    environment:
+      - POSTGRES_DB=paperless
+      - POSTGRES_USER=paperless
+      - POSTGRES_PASSWORD=${ADMIN_PASSWORD}
+    volumes:
+      - paperless_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U paperless"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  paperless-redis:
+    image: redis:7-alpine
+    container_name: paperless-redis
+    restart: unless-stopped
+
+  paperless-tika:
+    image: apache/tika:latest
+    container_name: paperless-tika
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+
+  paperless-gotenberg:
+    image: gotenberg/gotenberg:latest
+    container_name: paperless-gotenberg
+    restart: unless-stopped
+    command:
+      - gotenberg
+      - --chromium-disable-javascript=true
+      - --chromium-allow-list=file:///tmp/.*
+    security_opt:
+      - apparmor:unconfined
+
+volumes:
+  paperless_db:
+  paperless_data:
+  paperless_media:
+  paperless_export:
+  paperless_consume:

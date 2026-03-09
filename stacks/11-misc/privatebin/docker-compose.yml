@@ -1,0 +1,18 @@
+services:
+
+  privatebin:
+    image: privatebin/nginx-fpm-alpine:latest
+    container_name: privatebin
+    restart: unless-stopped
+    ports:
+      - "8100:8443"
+    volumes:
+      - privatebin_data:/srv/data
+      - /opt/privatebin/site.conf:/etc/nginx/http.d/site.conf:ro
+      - /opt/privatebin/certs:/etc/ssl/privatebin:ro
+    security_opt:
+      - apparmor:unconfined
+      - seccomp:unconfined
+
+volumes:
+  privatebin_data:

@@ -1,0 +1,17 @@
+services:
+
+  # ── Shepherd (automatic Docker image updater) ─────────────
+  shepherd:
+    image: containrrr/shepherd:latest
+    container_name: shepherd
+    restart: unless-stopped
+    environment:
+      - SLEEP_TIME=8h
+      - IGNORE_IMAGES=wazuh/*
+      - ROLLBACK_ON_FAILURE=true
+      - TZ=Europe/London
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    security_opt:
+      - no-new-privileges:true
+

@@ -1,0 +1,9 @@
+# Secrets — never commit the live env file
+.env
+
+# macOS
+.DS_Store
+
+# Editor
+.vscode/
+*.swp

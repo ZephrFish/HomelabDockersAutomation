@@ -1,0 +1,119 @@
+services:
+
+  # ── Netbox (IPAM / network documentation) ─────────────────
+  netbox:
+    image: netboxcommunity/netbox:latest
+    container_name: netbox
+    restart: unless-stopped
+    ports:
+      - "8093:8080"
+    environment:
+      - ALLOWED_HOSTS=*
+      - DB_HOST=netbox-postgres
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=${NETBOX_DB_PASSWORD}
+      - REDIS_HOST=netbox-redis
+      - REDIS_CACHE_HOST=netbox-redis-cache
+      - SECRET_KEY=${NETBOX_SECRET_KEY}
+      - SUPERUSER_NAME=admin
+      - SUPERUSER_EMAIL=${ADMIN_EMAIL}
+      - SUPERUSER_PASSWORD=${ADMIN_PASSWORD}
+      - SUPERUSER_API_TOKEN=${NETBOX_SUPERUSER_API_TOKEN}
+    volumes:
+      - netbox_media:/opt/netbox/netbox/media
+      - netbox_reports:/opt/netbox/netbox/reports
+      - netbox_scripts:/opt/netbox/netbox/scripts
+    depends_on:
+      netbox-postgres:
+        condition: service_healthy
+      netbox-redis:
+        condition: service_started
+      netbox-redis-cache:
+        condition: service_started
+    security_opt:
+      - apparmor:unconfined
+
+  netbox-worker:
+    image: netboxcommunity/netbox:latest
+    container_name: netbox-worker
+    restart: unless-stopped
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py rqworker
+    environment:
+      - ALLOWED_HOSTS=*
+      - DB_HOST=netbox-postgres
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=${NETBOX_DB_PASSWORD}
+      - REDIS_HOST=netbox-redis
+      - REDIS_CACHE_HOST=netbox-redis-cache
+      - SECRET_KEY=${NETBOX_SECRET_KEY}
+    depends_on:
+      - netbox
+    security_opt:
+      - apparmor:unconfined
+
+  netbox-housekeeping:
+    image: netboxcommunity/netbox:latest
+    container_name: netbox-housekeeping
+    restart: unless-stopped
+    command: /opt/netbox/venv/bin/python /opt/netbox/netbox/manage.py housekeeping
+    environment:
+      - ALLOWED_HOSTS=*
+      - DB_HOST=netbox-postgres
+      - DB_NAME=netbox
+      - DB_USER=netbox
+      - DB_PASSWORD=${NETBOX_DB_PASSWORD}
+      - REDIS_HOST=netbox-redis
+      - REDIS_CACHE_HOST=netbox-redis-cache
+      - SECRET_KEY=${NETBOX_SECRET_KEY}
+    depends_on:
+      - netbox
+    security_opt:
+      - apparmor:unconfined
+
+  netbox-postgres:
+    image: postgres:16-alpine
+    container_name: netbox-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=netbox
+      - POSTGRES_PASSWORD=${NETBOX_DB_PASSWORD}
+      - POSTGRES_DB=netbox
+    volumes:
+      - netbox_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U netbox"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt:
+      - apparmor:unconfined
+
+  netbox-redis:
+    image: redis:7-alpine
+    container_name: netbox-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - netbox_redis:/data
+    security_opt:
+      - apparmor:unconfined
+
+  netbox-redis-cache:
+    image: redis:7-alpine
+    container_name: netbox-redis-cache
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - netbox_redis_cache:/data
+    security_opt:
+      - apparmor:unconfined
+
+volumes:
+  netbox_media:
+  netbox_reports:
+  netbox_scripts:
+  netbox_db:
+  netbox_redis:
+  netbox_redis_cache:

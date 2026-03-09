@@ -1,0 +1,115 @@
+services:
+
+  # ── Dozzle (Docker log viewer) ────────────────────────────
+  dozzle:
+    image: amir20/dozzle:latest
+    container_name: dozzle
+    restart: unless-stopped
+    ports:
+      - "9999:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+
+  # ── code-server (VS Code in browser) ─────────────────────
+  code-server:
+    image: lscr.io/linuxserver/code-server:latest
+    container_name: code-server
+    restart: unless-stopped
+    ports:
+      - "8484:8443"
+    security_opt:
+      - apparmor:unconfined
+    environment:
+      - PUID=0
+      - PGID=0
+      - TZ=Europe/London
+      - PASSWORD=${ADMIN_PASSWORD}
+      - SUDO_PASSWORD=${ADMIN_PASSWORD}
+      - DEFAULT_WORKSPACE=/opt
+    volumes:
+      - code_server_config:/config
+      - /opt:/opt
+
+  # ── pgAdmin4 (PostgreSQL GUI) ─────────────────────────────
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    ports:
+      - "5050:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_PASSWORD}
+    volumes:
+      - pgadmin_data:/var/lib/pgadmin
+    security_opt:
+      - apparmor:unconfined
+
+  # ── Semaphore (Ansible UI) ────────────────────────────────
+  semaphore:
+    image: semaphoreui/semaphore:latest
+    container_name: semaphore
+    restart: unless-stopped
+    ports:
+      - "3333:3000"
+    environment:
+      SEMAPHORE_DB_DIALECT: bolt
+      SEMAPHORE_ADMIN: admin
+      SEMAPHORE_ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      SEMAPHORE_ADMIN_NAME: Admin
+      SEMAPHORE_ADMIN_EMAIL: ${ADMIN_EMAIL}
+      SEMAPHORE_ACCESS_KEY_ENCRYPTION: ${SEMAPHORE_ACCESS_KEY_ENCRYPTION}
+    volumes:
+      - semaphore_data:/home/semaphore
+    security_opt:
+      - apparmor:unconfined
+
+  # ── OWASP ZAP (web app scanner) ───────────────────────────
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    container_name: zap
+    restart: unless-stopped
+    ports:
+      - "8091:8080"
+    command: zap-webswing.sh
+    security_opt:
+      - apparmor:unconfined
+    volumes:
+      - zap_data:/home/zap/.ZAP
+      - zap_wrk:/zap/wrk
+
+  # ── WireGuard Easy (VPN + GUI) ────────────────────────────
+  wg-easy:
+    image: ghcr.io/wg-easy/wg-easy:latest
+    container_name: wg-easy
+    restart: unless-stopped
+    ports:
+      - "51821:51821/tcp"
+      - "51822:51822/udp"
+    environment:
+      - LANG=en
+      - WG_HOST=${HOST_IP}
+      - PASSWORD_HASH=${WG_PASSWORD_HASH}
+      - WG_PORT=51822
+      - WG_DEFAULT_ADDRESS=10.8.0.x
+      - WG_DEFAULT_DNS=1.1.1.1
+      - WG_MTU=1420
+      - WG_ALLOWED_IPS=0.0.0.0/0
+    volumes:
+      - wg_easy_data:/etc/wireguard
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+      - net.ipv4.conf.all.src_valid_mark=1
+    security_opt:
+      - apparmor:unconfined
+
+volumes:
+  code_server_config:
+  pgadmin_data:
+  semaphore_data:
+  zap_data:
+  zap_wrk:
+  wg_easy_data:

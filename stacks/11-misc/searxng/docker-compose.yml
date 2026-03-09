@@ -1,0 +1,16 @@
+services:
+
+  # ── SearXNG (private meta-search engine) ─────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    ports:
+      - "8102:8080"
+    environment:
+      - SEARXNG_BASE_URL=http://10.10.76.127:8102/
+    volumes:
+      - /opt/searxng/config:/etc/searxng:rw
+    security_opt:
+      - apparmor:unconfined
+

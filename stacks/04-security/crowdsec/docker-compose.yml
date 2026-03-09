@@ -1,0 +1,21 @@
+services:
+
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    container_name: crowdsec
+    restart: unless-stopped
+    security_opt:
+      - apparmor:unconfined
+    ports:
+      - "8090:8080"
+    volumes:
+      - /opt/crowdsec/config:/etc/crowdsec
+      - crowdsec_data:/var/lib/crowdsec/data
+      - /var/log/auth.log:/var/log/auth.log:ro
+      - /var/log/syslog:/var/log/syslog:ro
+    environment:
+      GID: "1000"
+      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/base-http-scenarios crowdsecurity/http-cve crowdsecurity/linux"
+
+volumes:
+  crowdsec_data:

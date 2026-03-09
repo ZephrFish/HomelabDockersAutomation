@@ -1,0 +1,19 @@
+services:
+
+  # ── Restic REST Server (backup backend) ───────────────────
+  restic:
+    image: restic/rest-server:latest
+    container_name: restic
+    restart: unless-stopped
+    ports:
+      - "8105:8000"
+    environment:
+      - OPTIONS=--no-auth
+      - RESTIC_PASSWORD=Passw0rd1
+    volumes:
+      - restic_data:/data
+    security_opt:
+      - no-new-privileges:true
+
+volumes:
+  restic_data:
